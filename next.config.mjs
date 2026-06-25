@@ -24,6 +24,9 @@ const config = {
       {
         hostname: "xxvyufhdtunogxjibato.supabase.co",
       },
+      {
+        hostname: "wungxiocuhartzjueysn.supabase.co",
+      },
     ],
   },
   /**

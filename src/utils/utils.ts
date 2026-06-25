@@ -1,6 +1,6 @@
 import { z } from "zod";
 import * as R from "ramda";
-import { type FileErrors } from "use-file-picker/types";
+import { type FileErrors } from "use-file-picker/dist/interfaces";
 
 export function asOptionalField<T extends z.ZodTypeAny>(schema: T) {
   return schema.optional().or(z.literal(""));

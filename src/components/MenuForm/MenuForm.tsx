@@ -86,8 +86,8 @@ export const useUpsertMenu = () => {
       router.push(`/menu/manage/${newMenu.slug}/restaurant`);
     } catch (error) {
       toast({
-        title: "Coś poszło nie tak",
-        description: "Odśwież stronę i spróbuj ponownie",
+        title: "Something went wrong",
+        description: "Refresh the page and try again",
         variant: "destructive",
         duration: 5000,
       });
