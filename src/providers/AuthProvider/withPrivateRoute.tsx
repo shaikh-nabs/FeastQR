@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useUser } from "~/providers/AuthProvider/AuthProvider";
+import { LoadingScreen } from "~/components/LoadingScreen";
 
 export const withPrivateRoute = <T extends object>(
   WrappedComponent: React.FunctionComponent<T>,
@@ -18,6 +19,7 @@ export const withPrivateRoute = <T extends object>(
       }
     }, [user, router, isLoading]);
 
+    if (isLoading) return <LoadingScreen />;
     if (!user) return null;
 
     return <WrappedComponent {...props} />;

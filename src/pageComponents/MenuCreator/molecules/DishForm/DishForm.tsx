@@ -11,8 +11,6 @@ import { useUser } from "~/providers/AuthProvider/AuthProvider";
 import { assert } from "~/utils/assert";
 import { uploadFileToStorage } from "~/utils/uploadFile";
 import Select from "react-select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import Image from "next/image";
 import { cn } from "~/utils/cn";
 import { generateDishImagePath } from "~/server/supabase/storagePaths";
 import { getCategoryTranslations } from "~/utils/categoriesUtils";
@@ -120,6 +118,7 @@ export const DishForm = ({
   if (isLoading || !menuData) return null;
 
   const initialLanguage = getDefaultLanguage(menuData.menuLanguages);
+  const lang = menuData.menuLanguages[0]!;
 
   const mappedCategories =
     categoriesList?.map((val) => ({
@@ -146,78 +145,37 @@ export const DishForm = ({
         onSubmit={form.handleSubmit(onSubmit)}
       >
         <div className="flex w-full flex-col gap-4">
-          <div className="flex flex-col">
-            <Tabs defaultValue={initialLanguage.languageId} className="gap-0">
-              <TabsList className="gap-4 bg-white p-0">
-                {menuData?.menuLanguages.map((lang, index) => (
-                  <TabsTrigger
-                    className={cn(
-                      "data-[state=active]:bg-muted",
-                      form.formState.errors.translatedDishData?.[index] &&
-                        "border-2 border-red-300",
-                    )}
-                    key={lang.languageId}
-                    value={lang.languageId}
-                  >
-                    <div className="flex flex-row items-center gap-4">
-                      <Image
-                        src={lang.languages.flagUrl}
-                        alt="Flag"
-                        width={16}
-                        height={16}
-                      />
-                      {lang.languages.name}
-                    </div>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {menuData?.menuLanguages.map((lang, index) => (
-                <TabsContent
-                  value={lang.languageId}
-                  key={lang.languageId}
-                  className="mt-0 rounded-b-lg bg-muted p-4 "
+          <div className="flex flex-col gap-4 rounded-b-lg bg-muted p-4">
+            <Input
+              {...form.register("translatedDishData.0.languageId")}
+              value={lang.languageId}
+              className="hidden"
+            />
+            <FormField
+              control={form.control}
+              name="translatedDishData.0.name"
+              render={({ field }) => (
+                <FormInput
+                  label={`${t("dishForm.dishName")} (${lang.languages.isoCode})`}
                 >
-                  <div className="flex flex-col gap-4">
-                    <Input
-                      {...form.register(
-                        `translatedDishData.${index}.languageId`,
-                      )}
-                      value={lang.languageId}
-                      className="hidden"
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`translatedDishData.${index}.name`}
-                      render={({ field }) => (
-                        <FormInput
-                          label={`${t("dishForm.dishName")} (${
-                            lang.languages.isoCode
-                          })`}
-                        >
-                          <Input {...field} placeholder="Pierogi Ruskie" />
-                        </FormInput>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`translatedDishData.${index}.description`}
-                      render={({ field }) => (
-                        <FormInput
-                          label={`${t("dishForm.dishDescription")} (${
-                            lang.languages.isoCode
-                          })`}
-                        >
-                          <Input
-                            {...field}
-                            placeholder={t("dishForm.descriptionPlaceholder")}
-                          />
-                        </FormInput>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
+                  <Input {...field} placeholder="Pierogi Ruskie" />
+                </FormInput>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="translatedDishData.0.description"
+              render={({ field }) => (
+                <FormInput
+                  label={`${t("dishForm.dishDescription")} (${lang.languages.isoCode})`}
+                >
+                  <Input
+                    {...field}
+                    placeholder={t("dishForm.descriptionPlaceholder")}
+                  />
+                </FormInput>
+              )}
+            />
           </div>
 
           <FormField

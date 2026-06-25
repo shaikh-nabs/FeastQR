@@ -6,17 +6,15 @@ import {
   UmamiAnalyticsProvider,
 } from "./AnalyticsProvider/AnalyticsProvider";
 import React from "react";
-import { type Language } from "~/i18n/settings";
 import { I18NextProvider } from "./I18NextProvider/I18NextProvider";
 
 type ProvidersProps = {
   children: React.ReactNode;
-  initialLanugage: Language;
 };
 
-export function Providers({ children, initialLanugage }: ProvidersProps) {
+export function Providers({ children }: ProvidersProps) {
   return (
-    <I18NextProvider initialLanguage={initialLanugage}>
+    <I18NextProvider>
       <ThemeProvider attribute="class" forcedTheme="light">
         {children}
       </ThemeProvider>

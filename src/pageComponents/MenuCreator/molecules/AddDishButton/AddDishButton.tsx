@@ -31,7 +31,7 @@ export const AddDishButton = ({
           {buttonText ?? t("addDishButton.addDish")}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {t("addDishButton.addDish")}
@@ -59,7 +59,7 @@ export const EditDishButton = ({
       <DialogTrigger asChild>
         <Button>{t("addDishButton.edit")}</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {t("addDishButton.editDish")}

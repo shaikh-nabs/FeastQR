@@ -65,7 +65,7 @@ async function RootLayout({ children }: { children: React.ReactNode }) {
         >
           <TRPCReactProvider headers={headers()}>
             <AuthProvider {...user}>
-              <Providers initialLanugage={initialLanguage}>
+              <Providers>
                 <div className="flex min-h-screen flex-col gap-6">
                   {children}
                   <TailwindIndicator />

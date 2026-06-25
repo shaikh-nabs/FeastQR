@@ -9,32 +9,22 @@ import { type AppRouter } from "~/server/api/root";
 import { getUrl, transformer } from "./shared";
 import { supabase } from "~/server/supabase/supabaseClient";
 
-export const api = createTRPCReact<AppRouter>({
-  overrides: {
-    useMutation: {
-      /**
-       * This function is called whenever a `.useMutation` succeeds
-       **/
-      async onSuccess(opts) {
-        /**
-         * @note that order here matters:
-         * The order here allows route changes in `onSuccess` without
-         * having a flash of content change whilst redirecting.
-         **/
-        // Calls the `onSuccess` defined in the `useQuery()`-options:
-        await opts.originalFn();
-        // Invalidate all queries in the react-query cache:
-        await opts.queryClient.invalidateQueries();
-      },
-    },
-  },
-});
+export const api = createTRPCReact<AppRouter>();
 
 export function TRPCReactProvider(props: {
   children: React.ReactNode;
   headers: Headers;
 }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 30 * 1000,
+          },
+        },
+      }),
+  );
 
   const [trpcClient] = useState(() =>
     api.createClient({

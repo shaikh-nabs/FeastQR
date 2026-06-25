@@ -33,7 +33,7 @@ export const AddVariantButton = ({
           {buttonText ?? t("addDishVariantButton.addVariant")}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {t("addDishVariantButton.addVariant")}
@@ -64,7 +64,7 @@ export const EditVariantButton = ({
       <DialogTrigger asChild>
         <Button>{t("addDishVariantButton.edit")}</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {t("addDishVariantButton.editVariant")}

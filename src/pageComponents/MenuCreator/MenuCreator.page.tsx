@@ -17,9 +17,7 @@ import {
 import { DeleteDishButton } from "./molecules/DeleteDishButton/DeleteDishButton";
 import { parseDishes } from "~/utils/parseDishes";
 
-import { useRef, useState } from "react";
 import { getDefaultLanguage } from "~/utils/getDefaultLanguage";
-import { MenuLanguagesSelector } from "~/components/LanguagesSelector/LanguagesSelector";
 import { useTranslation } from "react-i18next";
 import { type TagType } from "@prisma/client";
 import {
@@ -44,10 +42,6 @@ export const MenuCreatorPage = ({
 }) => {
   const { data, error, isLoading } = api.menus.getMenuBySlug.useQuery({ slug });
   const { toast } = useToast();
-  const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(
-    null,
-  );
-  const defaultLanguageSet = useRef(false);
   const { t } = useTranslation();
 
   useHandleFetchError({
@@ -65,14 +59,9 @@ export const MenuCreatorPage = ({
 
   const defaultLanguage = getDefaultLanguage(data.menuLanguages);
 
-  if (!defaultLanguageSet.current) {
-    setSelectedLanguageId(defaultLanguage.languageId);
-    defaultLanguageSet.current = true;
-  }
-
   const parsedDishes = parseDishes(
     data,
-    selectedLanguageId || defaultLanguage.languageId,
+    defaultLanguage.languageId,
   );
 
   return (
@@ -101,15 +90,6 @@ export const MenuCreatorPage = ({
                 </h3>
               </div>
             </div>
-          </div>
-          <div className="my-auto h-full">
-            <MenuLanguagesSelector
-              menuLanguages={data.menuLanguages}
-              selectedLanguageId={
-                selectedLanguageId || defaultLanguage.languageId
-              }
-              onSelectedLanguageChange={setSelectedLanguageId}
-            />
           </div>
         </div>
       </div>

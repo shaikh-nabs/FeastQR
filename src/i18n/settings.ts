@@ -1,7 +1,7 @@
 import { type Namespace } from "i18next";
 
 export const fallbackLng = "en" as const;
-export const languages = [fallbackLng, "pl"] as const;
+export const languages = [fallbackLng] as const;
 export const defaultNamespace: Namespace = "common";
 export type Language = (typeof languages)[number];
 

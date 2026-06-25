@@ -1,6 +1,4 @@
-import { type Resources } from "../types";
-
-const messages: Resources["common"] = {
+const messages = {
   login: {
     title: "Log in",
     emailLabel: "Email",

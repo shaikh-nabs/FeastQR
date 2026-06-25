@@ -7,9 +7,6 @@ import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/use-toast";
 import { api } from "~/trpc/react";
 import { getBaseUrl } from "~/utils/getBaseUrl";
-import { DefaultLanguagesSelector } from "./molecules/DefaultLanguageSelector/DefaultLanguageSelector";
-import { getDefaultLanguage } from "~/utils/getDefaultLanguage";
-import { LanguagesSelector } from "./molecules/LanguagesSelector/LanguagesSelector";
 import { useTranslation } from "react-i18next";
 import { useUserSubscription } from "~/shared/hooks/useUserSubscription";
 import QRCode from "qrcode.react";
@@ -24,7 +21,8 @@ export const RestaurantDashboard = ({
   const { data, error, isLoading } = api.menus.getMenuBySlug.useQuery({ slug });
   const { toast } = useToast();
   const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const utils = api.useContext();
   const { isSubscribed } = useUserSubscription();
   const {
     mutateAsync: createPremiumCheckout,
@@ -38,6 +36,7 @@ export const RestaurantDashboard = ({
 
     if (data.isPublished) {
       await unpublishMenu({ menuId: data.id });
+      utils.menus.invalidate();
       toast({
         title: t("restaurantDashboard.menuUnpublishedNotification"),
         description: t(
@@ -46,6 +45,7 @@ export const RestaurantDashboard = ({
       });
     } else {
       await publishMenu({ menuId: data.id });
+      utils.menus.invalidate();
       toast({
         title: t("restaurantDashboard.menuPublishedNotification"),
         description: t(
@@ -126,7 +126,7 @@ export const RestaurantDashboard = ({
               size="lg"
               onClick={async () => {
                 const checkoutUrl = await createPremiumCheckout({
-                  language: i18n.language as "en" | "pl",
+                  language: "en",
                 });
 
                 openLemonSqueezy(checkoutUrl);
@@ -179,28 +179,6 @@ export const RestaurantDashboard = ({
           <p className="text-center text-3xl font-semibold">
             {t("restaurantDashboard.settings")}
           </p>
-          <div className="flex flex-col gap-4">
-            <p className=" text-lg ">
-              {t("restaurantDashboard.availableLanguages")}
-            </p>
-            <LanguagesSelector
-              menuId={data.id}
-              initialLanguages={data.menuLanguages.map(
-                (lang) => lang.languageId,
-              )}
-            />
-          </div>
-          <div className="flex flex-col gap-4">
-            <p className=" text-lg ">
-              {t("restaurantDashboard.defaultLanguage")}
-            </p>
-            <DefaultLanguagesSelector
-              menuId={data.id}
-              initialDefaultLanguage={
-                getDefaultLanguage(data.menuLanguages).languageId
-              }
-            />
-          </div>
           <SocialMediaHandlesForm
             menuId={data.id}
             defaultValues={{

@@ -32,10 +32,12 @@ export const SocialMediaHandlesForm = ({
     resolver: zodResolver(socialMediaValidationSchema),
   });
   const { mutateAsync } = api.menus.updateMenuSocials.useMutation();
+  const utils = api.useContext();
   const { toast } = useToast();
   const onSubmit = async (values: SocialMediaFormValues) => {
     try {
       await mutateAsync({ ...values, menuId });
+      utils.menus.invalidate();
       toast({
         title: t("socialMediaForm.updatedToastTitle"),
         description: t("socialMediaForm.updatedToastDescription"),

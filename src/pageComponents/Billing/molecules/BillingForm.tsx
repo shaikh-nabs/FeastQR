@@ -34,6 +34,7 @@ import { useTranslation } from "react-i18next";
 
 const CancelButton = () => {
   const { t } = useTranslation();
+  const utils = api.useContext();
 
   const { isSubscribed, isSubscriptionLoading, subscriptionData } =
     useUserSubscription();
@@ -43,6 +44,7 @@ const CancelButton = () => {
     isLoading: isCancelSubscriptionLoading,
   } = api.payments.cancelSubscription.useMutation({
     onSuccess: () => {
+      utils.payments.invalidate();
       toast({
         title: t("notifications.subscriptionCancelled"),
         description: t("notifications.subscriptionCancelledDescription"),
@@ -83,7 +85,7 @@ const CancelButton = () => {
 };
 
 export function BillingForm() {
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
 
   const { isSubscribed, isSubscriptionLoading, subscriptionData } =
     useUserSubscription();
@@ -148,7 +150,7 @@ export function BillingForm() {
                   }
 
                   const checkoutUrl = await mutateAsync({
-                    language: i18n.language as "en" | "pl",
+                    language: "en",
                   });
 
                   if (checkoutUrl) {

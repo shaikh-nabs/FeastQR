@@ -49,9 +49,11 @@ export const AuthProvider = ({
     initialSession,
   );
   const [user, setUser] = useState<User | null>(initialUser);
-  const [isLoading, setIsLoading] = useState(!initialUser);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (initialUser) return;
+
     void supabase()
       .auth.getSession()
       .then(({ data: { session } }) => {
@@ -73,7 +75,7 @@ export const AuthProvider = ({
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [initialUser]);
 
   const value = {
     session: userSession,

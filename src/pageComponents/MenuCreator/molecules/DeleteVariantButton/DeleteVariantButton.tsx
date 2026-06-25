@@ -24,8 +24,10 @@ export const DeleteVariantButton = ({
   const { t } = useTranslation();
   const [modalOpen, setModalOpen] = useState(false);
   const { mutateAsync } = api.menus.deleteVariant.useMutation();
+  const utils = api.useContext();
   const onDelete = async () => {
     await mutateAsync({ variantId: id });
+    utils.menus.invalidate();
   };
 
   return (
