@@ -52,17 +52,21 @@ export const AuthProvider = ({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (initialUser) return;
+    // Only fetch the session on mount when it wasn't provided by the server.
+    if (!initialUser) {
+      void supabase()
+        .auth.getSession()
+        .then(({ data: { session } }) => {
+          setUserSession(session);
+          setUser(session?.user ?? null);
+          setCookies(session);
+          setIsLoading(false);
+        });
+    }
 
-    void supabase()
-      .auth.getSession()
-      .then(({ data: { session } }) => {
-        setUserSession(session);
-        setUser(session?.user ?? null);
-        setCookies(session);
-        setIsLoading(false);
-      });
-
+    // Always listen for auth changes (including SIGNED_OUT) so logout clears
+    // both the React state and the auth cookies, regardless of whether the
+    // user was hydrated from the server.
     const { data: authListener } = supabase().auth.onAuthStateChange(
       (_event, session) => {
         setUserSession(session);

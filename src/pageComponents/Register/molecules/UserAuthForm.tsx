@@ -74,30 +74,49 @@ export function UserAuthForm() {
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
-    try {
-      await supabase().auth.signUp({
-        ...data,
-        options: {
-          data: translations[i18n.language as "en" | "pl"],
-        },
-      });
+    const { data: signUpData, error } = await supabase().auth.signUp({
+      ...data,
+      options: {
+        data: translations[i18n.language as "en" | "pl"],
+      },
+    });
 
+    if (error) {
       toast({
-        title: t("register.checkYourEmailForConfirmation"),
-        description: t("common.confirmYourEmail"),
-        variant: "default",
+        title: "Error",
+        description: isAuthError(error)
+          ? error.message
+          : t("notifications.somethingWentWrong"),
+        variant: "destructive",
         duration: 9000,
       });
-    } catch (e) {
-      if (isAuthError(e)) {
-        toast({
-          title: "Error",
-          description: e.message,
-          variant: "destructive",
-          duration: 9000,
-        });
-      }
+
+      return;
     }
+
+    // Supabase does not error when the email is already registered (to prevent
+    // email enumeration). Instead it returns a user with an empty `identities`
+    // array. Use that to detect and surface the "already in use" case.
+    const isEmailAlreadyInUse =
+      signUpData.user?.identities?.length === 0;
+
+    if (isEmailAlreadyInUse) {
+      toast({
+        title: t("register.emailAlreadyInUse"),
+        description: t("register.emailAlreadyInUseDescription"),
+        variant: "destructive",
+        duration: 9000,
+      });
+
+      return;
+    }
+
+    toast({
+      title: t("register.checkYourEmailForConfirmation"),
+      description: t("common.confirmYourEmail"),
+      variant: "default",
+      duration: 9000,
+    });
   };
 
   return (

@@ -105,7 +105,7 @@ export function BillingForm() {
   const utils = api.useContext();
   const { toast } = useToast();
   const cancelOrRenewDate = new Date(
-    subscriptionData?.endsAt || subscriptionData?.endsAt || new Date(),
+    subscriptionData?.endsAt || subscriptionData?.renewsAt || new Date(),
   );
 
   const isPaymentLoading =

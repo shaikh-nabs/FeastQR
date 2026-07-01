@@ -79,6 +79,19 @@ In the dashboard: **Settings → Webhooks → Add New Webhook**
 1. **URL:** `https://your-domain.com/payments-api/subscription-updated`
    - For local testing, expose your dev server with a tunnel (e.g. `ngrok http 3000`)
      and use the tunnel URL.
+
+   <!-- TEMPORARY DEV ONLY — inspect payloads, does NOT update the app/DB.
+        Swap back to the real endpoint above once you have a tunnel/deploy.
+   URL: https://webhook.site/5103aa68-4347-4763-8ff8-c318dd1a64aa
+   -->
+
+   > ⚠️ **webhook.site is an inspector only.** Using
+   > `https://webhook.site/5103aa68-4347-4763-8ff8-c318dd1a64aa` lets you *see* the
+   > events Razorpay fires and view their JSON, but it does **not** forward anything
+   > to your app — so your `subscriptions` table will **not** update and the billing
+   > page will **not** flip to Premium. It also can't pass the signature check in
+   > `route.ts`. Use it only to confirm events fire / inspect payloads. For the
+   > actual flow to work locally you still need a tunnel or a deployed URL.
 2. **Secret:** set a value, and put the **same** value in `RAZORPAY_WEBHOOK_SECRET`.
 3. **Active events** (all handled in the code):
    - `subscription.activated`

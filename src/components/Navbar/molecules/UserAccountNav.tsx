@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -16,6 +17,7 @@ import { api } from "~/trpc/react";
 export function UserAccountNav() {
   const { data: user } = api.auth.getProfile.useQuery();
   const { t } = useTranslation();
+  const router = useRouter();
 
   return (
     <DropdownMenu>
@@ -43,7 +45,11 @@ export function UserAccountNav() {
           className="cursor-pointer"
           onSelect={(event) => {
             event.preventDefault();
-            void supabase().auth.signOut();
+            void (async () => {
+              await supabase().auth.signOut();
+              router.push("/");
+              router.refresh();
+            })();
           }}
         >
           {t("userAccountNav.logout")}

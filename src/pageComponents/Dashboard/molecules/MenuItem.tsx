@@ -30,7 +30,7 @@ export function MenuItem({ menu }: MenuItemProps) {
           </div>
         </Link>
       </div>
-      <MenuOperations menuId={menu.id} />
+      <MenuOperations menuId={menu.id} slug={menu.slug} />
     </div>
   );
 }

@@ -27,9 +27,10 @@ import { useToast } from "~/components/ui/use-toast";
 
 interface MenuOperationProps {
   menuId: string;
+  slug: string;
 }
 
-export function MenuOperations({ menuId: menuId }: MenuOperationProps) {
+export function MenuOperations({ menuId, slug }: MenuOperationProps) {
   const [showDeleteAlert, setShowDeleteAlert] = React.useState<boolean>(false);
   const { mutateAsync, isLoading } = api.menus.deleteMenu.useMutation();
   const { toast } = useToast();
@@ -52,7 +53,7 @@ export function MenuOperations({ menuId: menuId }: MenuOperationProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem>
-            <Link href={`/edit/${menuId}`} className="flex w-full">
+            <Link href={`/menu/manage/${slug}/edit`} className="flex w-full">
               {t("menuOperations.editMenu")}
             </Link>
           </DropdownMenuItem>

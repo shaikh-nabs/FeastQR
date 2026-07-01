@@ -20,7 +20,7 @@ import {
   storageBucketsNames,
   supabase,
 } from "~/server/supabase/supabaseClient";
-import { checkIfSubscribed } from "~/shared/hooks/useUserSubscription";
+import { isSubscriptionActive } from "~/shared/hooks/useUserSubscription";
 import { asOptionalField } from "~/utils/utils";
 
 const prepareTextForSlug = (text: string) => {
@@ -626,9 +626,8 @@ export const menusRouter = createTRPCRouter({
           profileId: ctx.user.id,
         },
       });
-      const isSubscriptionActive = checkIfSubscribed(subscription?.status);
 
-      if (!isSubscriptionActive) {
+      if (!isSubscriptionActive(subscription)) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "You need to subscribe to publish your menu",

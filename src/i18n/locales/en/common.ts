@@ -12,6 +12,8 @@ const messages = {
     submitButton: "Register",
     loginButton: "Log in",
     checkYourEmailForConfirmation: "Check your email for confirmation",
+    emailAlreadyInUse: "An account with this email already exists",
+    emailAlreadyInUseDescription: "Please log in instead or use a different email.",
   },
   resetPassword: {
     title: "Reset Password",

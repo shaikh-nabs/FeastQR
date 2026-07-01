@@ -2,7 +2,7 @@ import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
 import Razorpay from "razorpay";
 import { env } from "~/env.mjs";
 import { TRPCError } from "@trpc/server";
-import { checkIfSubscribed } from "~/shared/hooks/useUserSubscription";
+import { isSubscriptionActive } from "~/shared/hooks/useUserSubscription";
 import { z } from "zod";
 
 const razorpay = new Razorpay({
@@ -18,6 +18,21 @@ export const paymentsRouter = createTRPCRouter({
   createPremiumCheckout: privateProcedure
     .input(createPremiumCheckoutSchema)
     .mutation(async ({ ctx }) => {
+      // Prevent a user who already has an active subscription from creating a
+      // second one (which would result in a duplicate recurring charge).
+      const existingSubscription = await ctx.db.subscriptions.findFirst({
+        where: {
+          profileId: ctx.user.id,
+        },
+      });
+
+      if (isSubscriptionActive(existingSubscription)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "You already have an active subscription",
+        });
+      }
+
       const subscription = await razorpay.subscriptions.create({
         plan_id: env.RAZORPAY_SUBSCRIPTION_PLAN_ID,
         total_count: 12,
@@ -41,27 +56,37 @@ export const paymentsRouter = createTRPCRouter({
       },
     });
 
-    if (!subscription || subscription.status !== "active") {
+    if (
+      !subscription ||
+      subscription.status === "cancelled" ||
+      !isSubscriptionActive(subscription)
+    ) {
       throw new TRPCError({
         code: "CONFLICT",
         message: "Subscription not found or not active",
       });
     }
 
-    // Cancel at cycle end (Razorpay: true = cancel at cycle end)
-    const result = await razorpay.subscriptions.cancel(
+    // Cancel at cycle end (Razorpay: true = cancel at cycle end). This throws
+    // on API failure; on success the subscription stays "active" until the end
+    // of the current period, so we do NOT check the returned status here.
+    await razorpay.subscriptions.cancel(
       subscription.razorpaySubscriptionId,
       true,
     );
 
-    const didCancelSuccessfully = result.status === "cancelled";
-
-    if (!didCancelSuccessfully) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to cancel subscription",
-      });
-    }
+    // Optimistically reflect the cancellation so the UI updates immediately.
+    // The user keeps access until `endsAt`; the webhook will later mark it
+    // expired at the end of the period.
+    await ctx.db.subscriptions.update({
+      where: {
+        profileId: ctx.user.id,
+      },
+      data: {
+        status: "cancelled",
+        endsAt: subscription.renewsAt,
+      },
+    });
   }),
   getSubscriptionInfo: privateProcedure.query(async ({ ctx }) => {
     return ctx.db.subscriptions.findFirst({
@@ -82,9 +107,7 @@ export const paymentsRouter = createTRPCRouter({
       },
     });
 
-    const isSubscribed = checkIfSubscribed(subscription?.status);
-
-    if (!subscription || !isSubscribed) {
+    if (!isSubscriptionActive(subscription)) {
       throw new TRPCError({
         code: "CONFLICT",
         message: "Subscription not found or not active",
@@ -100,7 +123,7 @@ export const paymentsRouter = createTRPCRouter({
       },
     });
 
-    if (!subscription || !checkIfSubscribed(subscription?.status)) {
+    if (!subscription || !isSubscriptionActive(subscription)) {
       throw new TRPCError({
         code: "CONFLICT",
         message: "Subscription not found or not active",
@@ -110,10 +133,22 @@ export const paymentsRouter = createTRPCRouter({
     // Create a new subscription with same plan for updating payment method.
     // The old subscription will be cancelled in the webhook when the
     // new one becomes active.
+    //
+    // Start the new subscription's billing at the old subscription's renewal
+    // date so the customer is not charged again for the period they already
+    // paid for. The new mandate is authorized now, but the first charge only
+    // happens when the old subscription would have renewed (no double charge).
+    const nextRenewalSeconds = Math.floor(
+      new Date(subscription.renewsAt).getTime() / 1000,
+    );
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const shouldDeferStart = nextRenewalSeconds > nowSeconds;
+
     const newSubscription = await razorpay.subscriptions.create({
       plan_id: env.RAZORPAY_SUBSCRIPTION_PLAN_ID,
       total_count: 12,
       customer_notify: 0,
+      ...(shouldDeferStart ? { start_at: nextRenewalSeconds } : {}),
       notes: {
         userId: ctx.user.id,
         replacesSubscriptionId: subscription.razorpaySubscriptionId,
