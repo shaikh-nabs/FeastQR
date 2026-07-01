@@ -414,6 +414,11 @@ const messages = {
     subscriptionPlan: "Subscription Plan",
     subscriptionDescription:
       "Online menu and QR Code for your customers to scan.",
+    verifyingSubscription:
+      "We are validating your subscription. This can take up to a minute — no need to pay again.",
+    subscriptionActivated: "Subscription activated",
+    subscriptionActivatedDescription:
+      "Your Premium subscription is now active. Enjoy!",
     youAreCurrentlyOn: {
       firstPart: "Your plan: ",
       premium: "premium",

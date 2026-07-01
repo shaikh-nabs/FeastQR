@@ -67,8 +67,17 @@ export const isSubscriptionActive = (
   return false;
 };
 
-export const useUserSubscription = () => {
-  const { data, isLoading } = api.payments.getSubscriptionInfo.useQuery();
+export const useUserSubscription = (options?: {
+  // While set, poll the subscription info at this interval (ms). Used to wait
+  // for the Razorpay webhook to activate a just-created subscription.
+  refetchInterval?: number | false;
+}) => {
+  const { data, isLoading } = api.payments.getSubscriptionInfo.useQuery(
+    undefined,
+    {
+      refetchInterval: options?.refetchInterval ?? false,
+    },
+  );
   const isSubscribed = isSubscriptionActive(data);
 
   return {

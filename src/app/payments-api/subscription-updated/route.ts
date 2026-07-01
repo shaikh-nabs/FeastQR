@@ -134,9 +134,17 @@ export const POST = async (request: NextRequest) => {
       } status=${subscriptionEntity?.status ?? "none"}`,
     );
 
-    if (!subscriptionEntity) {
-      return new Response("No subscription entity in payload.", {
-        status: 400,
+    // Razorpay also sends non-subscription events (payment.*, order.*,
+    // invoice.*) to the same webhook. These have no subscription entity and
+    // are not relevant here — acknowledge them with 200 so Razorpay does not
+    // keep retrying (returning 400 caused the failures in the dashboard).
+    if (!event?.startsWith("subscription.") || !subscriptionEntity) {
+      console.log(
+        `[razorpay-webhook] ignoring non-subscription event: ${event ?? ""}`,
+      );
+
+      return new Response(null, {
+        status: 200,
       });
     }
 

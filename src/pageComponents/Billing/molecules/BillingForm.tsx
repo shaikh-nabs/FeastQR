@@ -88,8 +88,34 @@ const CancelButton = () => {
 export function BillingForm() {
   const { t } = useTranslation();
 
+  // After checkout succeeds, poll for the subscription until the Razorpay
+  // webhook activates it in our DB (can take a few seconds up to ~1 min).
+  const [isVerifying, setIsVerifying] = React.useState(false);
+
   const { isSubscribed, isSubscriptionLoading, subscriptionData } =
-    useUserSubscription();
+    useUserSubscription({ refetchInterval: isVerifying ? 3000 : false });
+
+  React.useEffect(() => {
+    if (!isVerifying) return;
+
+    // Stop verifying once the subscription is active.
+    if (isSubscribed) {
+      setIsVerifying(false);
+      toast({
+        title: t("billing.subscriptionActivated"),
+        description: t("billing.subscriptionActivatedDescription"),
+        variant: "default",
+      });
+
+      return;
+    }
+
+    // Safety timeout: stop polling after ~90s even if the webhook is delayed.
+    const timeout = setTimeout(() => setIsVerifying(false), 90_000);
+
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVerifying, isSubscribed]);
 
   const { mutateAsync: createCheckout, isLoading: isCreatePremiumCheckoutLoading } =
     api.payments.createPremiumCheckout.useMutation();
@@ -144,7 +170,15 @@ export function BillingForm() {
             </strong>
           </CardDescription>
         </CardHeader>
-        <CardContent>{t("billing.subscriptionDescription")}</CardContent>
+        <CardContent>
+          {t("billing.subscriptionDescription")}
+          {isVerifying && !isSubscribed && (
+            <div className="mt-4 flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              <Icons.spinner className="h-4 w-4 animate-spin" />
+              {t("billing.verifyingSubscription")}
+            </div>
+          )}
+        </CardContent>
         <CardFooter className="flex flex-col items-start space-y-2 md:flex-row md:justify-between md:space-x-0">
           <div className="flex gap-4">
             {subscriptionData?.status !== "cancelled" && (
@@ -173,6 +207,9 @@ export function BillingForm() {
                     if (checkoutData) {
                       await openRazorpayCheckout(checkoutData);
                       utils.payments.invalidate();
+                      // Payment done on Razorpay; wait for the webhook to
+                      // activate the subscription in our DB.
+                      setIsVerifying(true);
                     } else {
                       toast({
                         title: "Error",
@@ -185,9 +222,9 @@ export function BillingForm() {
                   await runAction();
                 }}
                 className={cn(buttonVariants())}
-                disabled={isPaymentLoading}
+                disabled={isPaymentLoading || isVerifying}
               >
-                {isPaymentLoading ? (
+                {isPaymentLoading || isVerifying ? (
                   <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 {isSubscribed ? "Update payment details" : "Upgrade to PRO"}
