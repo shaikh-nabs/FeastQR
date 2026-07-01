@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable padding-line-between-statements */
 
 import * as React from "react";
 import {
@@ -28,7 +29,7 @@ import { api } from "~/trpc/react";
 import { useUserSubscription } from "~/shared/hooks/useUserSubscription";
 import { useToast } from "~/components/ui/use-toast";
 import { cn } from "~/utils/cn";
-import { openLemonSqueezy } from "~/utils/payments";
+import { openRazorpayCheckout } from "~/utils/payments";
 import { Skeleton } from "~/components/ui/skeleton";
 import { useTranslation } from "react-i18next";
 
@@ -90,18 +91,25 @@ export function BillingForm() {
   const { isSubscribed, isSubscriptionLoading, subscriptionData } =
     useUserSubscription();
 
-  const { mutateAsync, isLoading: isCreatePremiumCheckoutLoading } =
+  const { mutateAsync: createCheckout, isLoading: isCreatePremiumCheckoutLoading } =
     api.payments.createPremiumCheckout.useMutation();
+
+  const { mutateAsync: getUpdatePaymentCheckout, isLoading: isUpdatePaymentLoading } =
+    api.payments.getUpdatePaymentMethodCheckout.useMutation();
 
   const { data: customerPortalUrl } =
     api.payments.getCustomerPortalUrl.useQuery(undefined, {
       enabled: isSubscribed,
     });
 
+  const utils = api.useContext();
   const { toast } = useToast();
   const cancelOrRenewDate = new Date(
     subscriptionData?.endsAt || subscriptionData?.endsAt || new Date(),
   );
+
+  const isPaymentLoading =
+    isCreatePremiumCheckoutLoading || isUpdatePaymentLoading;
 
   if (isSubscriptionLoading)
     return (
@@ -143,30 +151,43 @@ export function BillingForm() {
               <button
                 // eslint-disable-next-line @typescript-eslint/no-misused-promises
                 onClick={async () => {
-                  if (isSubscribed) {
-                    openLemonSqueezy(subscriptionData?.updatePaymentUrl || "");
+                  const runAction = async () => {
+                    if (isSubscribed) {
+                      const checkoutData = await getUpdatePaymentCheckout();
+                      await openRazorpayCheckout(checkoutData);
+                      utils.payments.invalidate();
+                      toast({
+                        title: "Payment method updated",
+                        description:
+                          "Your payment method has been updated successfully.",
+                        variant: "default",
+                      });
 
-                    return;
-                  }
+                      return;
+                    }
 
-                  const checkoutUrl = await mutateAsync({
-                    language: "en",
-                  });
-
-                  if (checkoutUrl) {
-                    openLemonSqueezy(checkoutUrl);
-                  } else {
-                    toast({
-                      title: "Error",
-                      description: t("notifications.somethingWentWrong"),
-                      variant: "destructive",
+                    const checkoutData = await createCheckout({
+                      language: "en",
                     });
-                  }
+
+                    if (checkoutData) {
+                      await openRazorpayCheckout(checkoutData);
+                      utils.payments.invalidate();
+                    } else {
+                      toast({
+                        title: "Error",
+                        description: t("notifications.somethingWentWrong"),
+                        variant: "destructive",
+                      });
+                    }
+                  };
+
+                  await runAction();
                 }}
                 className={cn(buttonVariants())}
-                disabled={isCreatePremiumCheckoutLoading}
+                disabled={isPaymentLoading}
               >
-                {isCreatePremiumCheckoutLoading ? (
+                {isPaymentLoading ? (
                   <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 {isSubscribed ? "Update payment details" : "Upgrade to PRO"}

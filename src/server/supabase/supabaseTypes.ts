@@ -378,31 +378,34 @@ export interface Database {
           created_at: string | null
           ends_at: string | null
           json_data: Json
-          lemon_squeezy_id: string
           profile_id: string
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          razorpay_subscription_id: string
           renews_at: string
           status: string
-          update_payment_url: string
         }
         Insert: {
           created_at?: string | null
           ends_at?: string | null
           json_data: Json
-          lemon_squeezy_id: string
           profile_id: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_subscription_id: string
           renews_at: string
           status: string
-          update_payment_url: string
         }
         Update: {
           created_at?: string | null
           ends_at?: string | null
           json_data?: Json
-          lemon_squeezy_id?: string
           profile_id?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_subscription_id?: string
           renews_at?: string
           status?: string
-          update_payment_url?: string
         }
         Relationships: [
           {

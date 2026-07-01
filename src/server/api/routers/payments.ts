@@ -1,61 +1,38 @@
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
-import { LemonsqueezyClient } from "lemonsqueezy.ts";
+import Razorpay from "razorpay";
 import { env } from "~/env.mjs";
 import { TRPCError } from "@trpc/server";
 import { checkIfSubscribed } from "~/shared/hooks/useUserSubscription";
 import { z } from "zod";
 
-const client = new LemonsqueezyClient(env.LEMON_SQUEEZY_API_KEY);
+const razorpay = new Razorpay({
+  key_id: env.RAZORPAY_KEY_ID,
+  key_secret: env.RAZORPAY_KEY_SECRET,
+});
 
 const createPremiumCheckoutSchema = z.object({
   language: z.enum(["en", "pl"]),
 });
 
-const checkoutTranslations: Record<"en" | "pl", LemonsqueezyProductOptions> = {
-  en: {
-    description: "Display QR menus to your clients.",
-    name: "FeastQR Menu",
-    receipt_button_text: "Go to FeastQR",
-    receipt_link_url: "https://www.feastqr.com/dashboard",
-    receipt_thank_you_note: "Thank you for your purchase!",
-    redirect_url: "https://www.feastqr.com/dashboard",
-  },
-  pl: {
-    description: "Wyświetlaj menu QR Twoim klientom.",
-    name: "FeastQR Menu",
-    receipt_button_text: "Przejdź do FeastQR",
-    receipt_link_url: "https://www.feastqr.com/dashboard",
-    receipt_thank_you_note: "Dziękujemy za zakup!",
-    redirect_url: "https://www.feastqr.com/dashboard",
-  },
-};
-
 export const paymentsRouter = createTRPCRouter({
   createPremiumCheckout: privateProcedure
     .input(createPremiumCheckoutSchema)
-    .mutation(async ({ ctx, input }) => {
-      const language = input.language;
-      const translations = checkoutTranslations[language];
-      const newCheckout = await client.createCheckout({
-        checkout_data: {
-          custom: {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            userId: ctx.user.id,
-          },
-          name: ctx.user.email || "",
-          email: ctx.user.email || "",
+    .mutation(async ({ ctx }) => {
+      const subscription = await razorpay.subscriptions.create({
+        plan_id: env.RAZORPAY_SUBSCRIPTION_PLAN_ID,
+        total_count: 12,
+        customer_notify: 1,
+        notes: {
+          userId: ctx.user.id,
         },
-        checkout_options: {
-          embed: true,
-        },
-
-        store: env.LEMON_SQUEEZY_STORE_ID,
-        variant: env.LEMON_SQUEEZY_SUBSCRIPTION_VARIANT_ID,
-        product_options: translations,
       });
 
-      return newCheckout.data.attributes.url;
+      return {
+        subscriptionId: subscription.id,
+        razorpayKeyId: env.RAZORPAY_KEY_ID,
+        userEmail: ctx.user.email || "",
+        userName: ctx.user.email || "",
+      };
     }),
   cancelSubscription: privateProcedure.mutation(async ({ ctx }) => {
     const subscription = await ctx.db.subscriptions.findFirst({
@@ -71,15 +48,13 @@ export const paymentsRouter = createTRPCRouter({
       });
     }
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const updateResult = await client.updateSubscription({
-      id: subscription.lemonSqueezyId,
-      cancelled: true,
-    });
+    // Cancel at cycle end (Razorpay: true = cancel at cycle end)
+    const result = await razorpay.subscriptions.cancel(
+      subscription.razorpaySubscriptionId,
+      true,
+    );
 
-    const didCancelSuccessfully =
-      updateResult.data.attributes.cancelled === true;
+    const didCancelSuccessfully = result.status === "cancelled";
 
     if (!didCancelSuccessfully) {
       throw new TRPCError({
@@ -97,7 +72,6 @@ export const paymentsRouter = createTRPCRouter({
         endsAt: true,
         renewsAt: true,
         status: true,
-        updatePaymentUrl: true,
       },
     });
   }),
@@ -117,47 +91,40 @@ export const paymentsRouter = createTRPCRouter({
       });
     }
 
-    const subscriptionResult = await client.retrieveSubscription({
-      id: subscription.lemonSqueezyId,
+    return "/dashboard/billing/portal" as string;
+  }),
+  getUpdatePaymentMethodCheckout: privateProcedure.mutation(async ({ ctx }) => {
+    const subscription = await ctx.db.subscriptions.findFirst({
+      where: {
+        profileId: ctx.user.id,
+      },
     });
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    return subscriptionResult.data.attributes.urls.customer_portal as string;
+    if (!subscription || !checkIfSubscribed(subscription?.status)) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "Subscription not found or not active",
+      });
+    }
+
+    // Create a new subscription with same plan for updating payment method.
+    // The old subscription will be cancelled in the webhook when the
+    // new one becomes active.
+    const newSubscription = await razorpay.subscriptions.create({
+      plan_id: env.RAZORPAY_SUBSCRIPTION_PLAN_ID,
+      total_count: 12,
+      customer_notify: 0,
+      notes: {
+        userId: ctx.user.id,
+        replacesSubscriptionId: subscription.razorpaySubscriptionId,
+      },
+    });
+
+    return {
+      subscriptionId: newSubscription.id,
+      razorpayKeyId: env.RAZORPAY_KEY_ID,
+      userEmail: ctx.user.email || "",
+      userName: ctx.user.email || "",
+    };
   }),
 });
-
-interface LemonsqueezyProductOptions {
-  /**
-   * A custom description for the product
-   */
-  description: string;
-  /**
-   * An array of variant IDs to enable for this checkout. If this is empty, all variants will be enabled
-   */
-  enabled_variants?: Array<string>;
-  /**
-   * An array of image URLs to use as the product's media
-   */
-  media?: Array<string>;
-  /**
-   * A custom name for the product
-   */
-  name: string;
-  /**
-   * A custom text to use for the order receipt email button
-   */
-  receipt_button_text: string;
-  /**
-   * A custom URL to use for the order receipt email button
-   */
-  receipt_link_url: string;
-  /**
-   * A custom thank you note to use for the order receipt email
-   */
-  receipt_thank_you_note: string;
-  /**
-   * A custom URL to redirect to after a successful purchase
-   */
-  redirect_url: string;
-}

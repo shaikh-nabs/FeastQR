@@ -429,15 +429,16 @@ model Profiles {
 }
 
 model Subscriptions {
-  profileId        String    @id @map("profile_id") @db.Uuid
-  updatePaymentUrl String    @map("update_payment_url")
-  renewsAt         DateTime  @map("renews_at") @db.Timestamptz(6)
-  endsAt           DateTime? @map("ends_at") @db.Timestamptz(6)
-  status           String
-  createdAt        DateTime? @map("created_at") @db.Timestamptz(6)
-  lemonSqueezyId   String    @map("lemon_squeezy_id")
-  jsonData         Json      @map("json_data")
-  profiles         Profiles  @relation(fields: [profileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  profileId             String    @id @map("profile_id") @db.Uuid
+  razorpaySubscriptionId String   @map("razorpay_subscription_id")
+  razorpayOrderId       String?   @map("razorpay_order_id")
+  razorpayPaymentId     String?   @map("razorpay_payment_id")
+  renewsAt              DateTime  @map("renews_at") @db.Timestamptz(6)
+  endsAt                DateTime? @map("ends_at") @db.Timestamptz(6)
+  status                String
+  createdAt             DateTime? @map("created_at") @db.Timestamptz(6)
+  jsonData              Json      @map("json_data")
+  profiles              Profiles  @relation(fields: [profileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("subscriptions")
   @@schema("public")

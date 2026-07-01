@@ -1,16 +1,82 @@
+/* eslint-disable padding-line-between-statements */
 import crypto from "crypto";
-import { type listAllSubscriptions } from "lemonsqueezy.ts";
+import Razorpay from "razorpay";
 import { type NextRequest } from "next/server";
 import { env } from "~/env.mjs";
 import { supabase } from "~/server/supabase/supabaseClient";
 
-// Put this in your billing lib and just import the type instead
-type LemonsqueezySubscription = Awaited<
-  ReturnType<typeof listAllSubscriptions>
->["data"][number];
+type RazorpaySubscriptionStatus =
+  | "created"
+  | "authenticated"
+  | "active"
+  | "pending"
+  | "halted"
+  | "cancelled"
+  | "completed"
+  | "expired";
 
-export type SubscriptionStatus =
-  LemonsqueezySubscription["attributes"]["status"];
+// Map Razorpay subscription statuses to our db status strings
+const mapStatus = (razorpayStatus: RazorpaySubscriptionStatus): string => {
+  switch (razorpayStatus) {
+    case "active":
+      return "active";
+    case "cancelled":
+      return "cancelled";
+    case "completed":
+    case "expired":
+      return "expired";
+    case "paused" as RazorpaySubscriptionStatus:
+      return "paused";
+    case "halted":
+      return "past_due";
+    case "created":
+    case "authenticated":
+      return "on_trial";
+    default:
+      return razorpayStatus;
+  }
+};
+
+type RazorpayEvent =
+  | "subscription.activated"
+  | "subscription.cancelled"
+  | "subscription.resumed"
+  | "subscription.completed"
+  | "subscription.expired"
+  | "subscription.paused"
+  | "subscription.halted"
+  | "subscription.started"
+  | "subscription.charged";
+
+type RazorpayWebhookPayload = {
+  entity: string;
+  account_id: string;
+  event: RazorpayEvent;
+  created_at: number;
+  contains: string[];
+  payload: {
+    subscription?: {
+      entity: {
+        id: string;
+        status: RazorpaySubscriptionStatus;
+        notes: Record<string, string>;
+        current_start?: number | null;
+        current_end?: number | null;
+        charge_at: number;
+        ended_at?: number | null;
+        created_at: number;
+        customer_id: string | null;
+      };
+    };
+    payment?: {
+      entity: {
+        id: string;
+        status: string;
+        amount: number;
+      };
+    };
+  };
+};
 
 const isError = (error: unknown): error is Error => {
   return error instanceof Error;
@@ -18,97 +84,119 @@ const isError = (error: unknown): error is Error => {
 
 export const runtime = "nodejs";
 
-// Add more events here if you want
-// https://docs.lemonsqueezy.com/api/webhooks#event-types
-type EventName =
-  | "order_created"
-  | "order_refunded"
-  | "subscription_created"
-  | "subscription_cancelled"
-  | "subscription_resumed"
-  | "subscription_expired"
-  | "subscription_paused"
-  | "subscription_unpaused"
-  | "subscription_payment_failed"
-  | "subscription_payment_success"
-  | "subscription_payment_recovered"
-  | "subscription_updated";
-
-type Payload = {
-  meta: {
-    test_mode: boolean;
-    event_name: EventName;
-    custom_data: { userId: string };
-  };
-  // Possibly not accurate: it's missing the relationships field and any custom data you add
-  data: LemonsqueezySubscription;
-};
-
 export const POST = async (request: NextRequest) => {
   try {
     const text = await request.text();
-    const hmac = crypto.createHmac(
-      "sha256",
-      env.LEMONS_SQUEEZY_SIGNATURE_SECRET,
-    );
-    const digest = Buffer.from(hmac.update(text).digest("hex"), "utf8");
-    const signature = Buffer.from(
-      request.headers.get("x-signature") as string,
-      "utf8",
+    const signature = request.headers.get("x-razorpay-signature") as string;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", env.RAZORPAY_WEBHOOK_SECRET)
+      .update(text)
+      .digest("hex");
+
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(expectedSignature, "utf8"),
+      Buffer.from(signature, "utf8"),
     );
 
-    if (!crypto.timingSafeEqual(digest, signature)) {
+    if (!isValid) {
       return new Response("Invalid signature.", {
         status: 400,
       });
     }
 
-    const payload = JSON.parse(text) as Payload;
-    const {
-      meta: { event_name: eventName, custom_data },
-      data: subscription,
-    } = payload;
+    const payload = JSON.parse(text) as RazorpayWebhookPayload;
+    const { event } = payload;
+    const subscriptionEntity = payload.payload?.subscription?.entity;
 
-    switch (eventName) {
-      case "order_created":
-        // Do stuff here if you are using orders
-        break;
-      case "order_refunded":
-        // Do stuff here if you are using orders
-        break;
-      case "subscription_created":
-      case "subscription_cancelled":
-      case "subscription_resumed":
-      case "subscription_expired":
-      case "subscription_paused":
-      case "subscription_unpaused":
-      case "subscription_payment_failed":
-      case "subscription_payment_success":
-      case "subscription_payment_recovered":
-      case "subscription_updated":
-        // Do something with the subscription here, like syncing to your database
+    if (!subscriptionEntity) {
+      return new Response("No subscription entity in payload.", {
+        status: 400,
+      });
+    }
 
+    const customData = subscriptionEntity.notes;
+    const userId = customData?.userId;
+
+    if (!userId) {
+      return new Response("No userId in subscription notes.", {
+        status: 400,
+      });
+    }
+
+    const status = mapStatus(subscriptionEntity.status);
+
+    switch (event) {
+      case "subscription.activated":
+      case "subscription.started":
+      case "subscription.cancelled":
+      case "subscription.resumed":
+      case "subscription.completed":
+      case "subscription.expired":
+      case "subscription.paused":
+      case "subscription.halted": {
+        // Check if this subscription replaces an old one (payment method update)
+        const replacesSubscriptionId =
+          customData?.replacesSubscriptionId;
+
+        if (
+          replacesSubscriptionId &&
+          (event === "subscription.activated" ||
+            event === "subscription.started")
+        ) {
+          // Cancel the old subscription
+          const tempRazorpay = new Razorpay({
+            key_id: env.RAZORPAY_KEY_ID,
+            key_secret: env.RAZORPAY_KEY_SECRET,
+          });
+          await tempRazorpay.subscriptions
+            .cancel(replacesSubscriptionId, true)
+            .catch(() => {
+              // Old subscription may already be cancelled
+            });
+        }
+
+        // eslint-disable-next-line padding-line-between-statements
+        const { error } = await supabase().from("subscriptions").upsert(
+          {
+            profile_id: userId,
+            razorpay_subscription_id: subscriptionEntity.id,
+            renews_at: new Date(
+              (subscriptionEntity.current_end ?? subscriptionEntity.charge_at) * 1000,
+            ).toISOString(),
+            ends_at: subscriptionEntity.ended_at
+              ? new Date(subscriptionEntity.ended_at * 1000).toISOString()
+              : null,
+            status,
+            json_data: JSON.stringify(subscriptionEntity, null, 5),
+          },
+          {
+            onConflict: "profile_id",
+          },
+        );
+
+        // eslint-disable-next-line padding-line-between-statements
+        if (error) console.error(JSON.stringify(error));
+        break;
+      }
+      case "subscription.charged": {
+        // Recurring payment successfully charged
+        // eslint-disable-next-line padding-line-between-statements
         const { error } = await supabase()
           .from("subscriptions")
-          .upsert({
-            ends_at: subscription.attributes.ends_at as unknown as string,
-            json_data: JSON.stringify(subscription, null, 5),
-            lemon_squeezy_id: subscription.id,
-            renews_at: subscription.attributes.renews_at as unknown as string,
-            status: subscription.attributes.status,
-            update_payment_url:
-              subscription.attributes.urls.update_payment_method,
+          .update({
+            status: "active",
+            json_data: JSON.stringify(subscriptionEntity, null, 5),
+          })
+          .eq("razorpay_subscription_id", subscriptionEntity.id);
 
-            profile_id: custom_data.userId,
-          });
-
+        // eslint-disable-next-line padding-line-between-statements
         if (error) console.error(JSON.stringify(error));
-
-        console.log(payload);
         break;
-      default:
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new Error(`🤷‍♀️ Unhandled event: ${eventName ?? ""}`);
+      }
+      default: {
+        throw new Error(`🤷‍♀️ Unhandled event: ${event ?? ""}`);
+      }
     }
   } catch (error: unknown) {
     console.error(JSON.stringify(error));

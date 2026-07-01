@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useUserSubscription } from "~/shared/hooks/useUserSubscription";
 import QRCode from "qrcode.react";
 import { SocialMediaHandlesForm } from "./molecules/SocialMediaHandles/SocialMediaHandles";
-import { openLemonSqueezy } from "~/utils/payments";
+import { openRazorpayCheckout } from "~/utils/payments";
 
 export const RestaurantDashboard = ({
   params: { slug },
@@ -125,11 +125,12 @@ export const RestaurantDashboard = ({
               loading={isCreatePremiumCheckoutLoading}
               size="lg"
               onClick={async () => {
-                const checkoutUrl = await createPremiumCheckout({
+                const checkoutData = await createPremiumCheckout({
                   language: "en",
                 });
 
-                openLemonSqueezy(checkoutUrl);
+                await openRazorpayCheckout(checkoutData);
+                utils.payments.invalidate();
               }}
             >
               {t("restaurantDashboard.upgradeAccount")}
